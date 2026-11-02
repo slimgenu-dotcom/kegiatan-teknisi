@@ -1,0 +1,27 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Ganti dengan email admin Anda (harus sama dengan ADMIN_EMAIL di index.html)
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email == 'admin@contoh.com';
+    }
+
+    match /kegiatan/{doc} {
+      // Semua pengguna aplikasi (teknisi & admin) boleh MELIHAT riwayat
+      allow read: if request.auth != null;
+
+      // Teknisi & admin boleh MENAMBAH catatan
+      allow create: if request.auth != null
+        && request.resource.data.teknisi in ['Abdul Mufid', 'Wawan']
+        && request.resource.data.jenis in ['Maintenance', 'PSB'];
+
+      // Hanya admin yang boleh MENGHAPUS
+      allow delete: if isAdmin();
+
+      // Tidak ada yang boleh mengedit catatan
+      allow update: if false;
+    }
+  }
+}

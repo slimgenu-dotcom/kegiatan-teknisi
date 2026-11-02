@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Catatan Teknisi WiFi</title>
+<style>
+  :root{--bg:#f3f5f9;--card:#fff;--pri:#1565c0;--ok:#2e7d32;--warn:#ef6c00;--txt:#1d2433;--mut:#6b7385;--line:#e1e5ee}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--txt)}
+  header{background:var(--pri);color:#fff;padding:14px 16px;position:sticky;top:0;z-index:5}
+  header h1{margin:0;font-size:18px}
+  header small{opacity:.85}
+  main{max-width:760px;margin:0 auto;padding:12px}
+  .tabs{display:flex;gap:6px;margin-bottom:12px}
+  .tabs button{flex:1;padding:10px;border:1px solid var(--line);background:#fff;border-radius:10px;font-weight:600;cursor:pointer}
+  .tabs button.on{background:var(--pri);color:#fff;border-color:var(--pri)}
+  .card{background:var(--card);border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.07)}
+  label{display:block;font-size:13px;font-weight:600;margin:10px 0 4px}
+  input,select,textarea{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;font-size:15px;font-family:inherit;background:#fff}
+  textarea{min-height:80px;resize:vertical}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .btn{width:100%;margin-top:14px;padding:12px;border:0;border-radius:10px;background:var(--ok);color:#fff;font-size:16px;font-weight:700;cursor:pointer}
+  .btn:disabled{opacity:.6}
+  .stamp{font-size:13px;color:var(--mut);background:#eef2fa;padding:8px 10px;border-radius:8px;margin-top:8px}
+  .previews{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+  .previews img,.photos img{width:84px;height:84px;object-fit:cover;border-radius:8px;border:1px solid var(--line);cursor:pointer}
+  .badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:12px;font-weight:700;color:#fff}
+  .b-mt{background:var(--warn)}.b-psb{background:var(--pri)}.b-ok{background:var(--ok)}
+  .item h3{margin:6px 0 2px;font-size:16px}
+  .meta{font-size:12px;color:var(--mut)}
+  .kv{font-size:14px;margin:4px 0}.kv b{color:var(--mut);font-weight:600}
+  .photos{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+  .filters{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+  .hide{display:none!important}
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:40}
+  .del{margin-top:10px;background:#c62828;color:#fff;border:0;border-radius:8px;padding:7px 12px;font-weight:600;cursor:pointer}
+  #viewer{position:fixed;inset:0;background:rgba(0,0,0,.9);display:none;align-items:center;justify-content:center;z-index:50}
+  #viewer img{max-width:95%;max-height:92%}
+  .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:10px 18px;border-radius:24px;font-size:14px;z-index:60;display:none}
+  .empty{text-align:center;color:var(--mut);padding:30px}
+</style>
+</head>
+<body>
+<header>
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+    <div>
+      <h1>📡 Catatan Kegiatan Teknisi WiFi</h1>
+      <small id="status">Menghubungkan…</small>
+    </div>
+    <button id="btnAdmin" style="background:#fff;color:#1565c0;border:0;border-radius:8px;padding:8px 12px;font-weight:700;cursor:pointer;white-space:nowrap">🔐 Admin</button>
+  </div>
+</header>
+
+<main>
+  <div class="tabs">
+    <button id="tabForm" class="on">➕ Entry Kegiatan</button>
+    <button id="tabList">📋 Riwayat</button>
+  </div>
+
+  <!-- FORM -->
+  <section id="formView" class="card">
+    <label>Nama Teknisi</label>
+    <select id="teknisi">
+      <option value="">— pilih teknisi —</option>
+      <option>Abdul Mufid</option>
+      <option>Wawan</option>
+    </select>
+
+    <label>Jenis Kegiatan</label>
+    <select id="jenis">
+      <option value="Maintenance">Maintenance</option>
+      <option value="PSB">PSB (Pemasangan Baru)</option>
+    </select>
+
+    <label>Nama Pelanggan</label>
+    <input id="pelanggan" placeholder="Nama pelanggan">
+    <label>Alamat / Lokasi</label>
+    <input id="alamat" placeholder="Alamat atau patokan lokasi">
+
+    <!-- Maintenance -->
+    <div id="mtFields">
+      <label>Masalah Maintenance</label>
+      <textarea id="masalah" placeholder="Contoh: Internet putus, LOS merah di ONT"></textarea>
+      <label>Solusi Final Maintenance</label>
+      <textarea id="solusi" placeholder="Contoh: Ganti patchcord & konektor, redaman normal"></textarea>
+    </div>
+
+    <!-- PSB -->
+    <div id="psbFields" class="hide">
+      <div class="row">
+        <div>
+          <label>Panjang Kabel (meter)</label>
+          <input id="kabel" type="number" inputmode="decimal" min="0" placeholder="0">
+        </div>
+        <div>
+          <label>Status PSB</label>
+          <select id="statusPsb">
+            <option>Done</option>
+            <option>Sudah ON</option>
+          </select>
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>Rasio / Splitter</label>
+          <select id="splitter">
+            <option>Tidak pakai splitter</option>
+            <option>1:2</option><option>1:4</option><option>1:8</option>
+            <option>1:16</option><option>1:32</option><option>Lainnya</option>
+          </select>
+        </div>
+        <div>
+          <label>Splitter: Beli atau Tidak?</label>
+          <select id="beliSplitter">
+            <option>Tidak beli (stok sendiri)</option>
+            <option>Beli</option>
+          </select>
+        </div>
+      </div>
+      <label>Router yang Dipakai</label>
+      <input id="router" placeholder="Contoh: TP-Link Archer C6 / ONT ZTE F609">
+      <label>Catatan Tambahan (opsional)</label>
+      <textarea id="catatan"></textarea>
+    </div>
+
+    <label id="fotoLabel">Foto Kegiatan (maks. 3)</label>
+    <input id="foto" type="file" accept="image/*" multiple>
+    <div class="previews" id="previews"></div>
+
+    <div class="stamp">🕒 Tanggal &amp; jam entry dicatat otomatis: <b id="jam"></b></div>
+    <button class="btn" id="simpan">💾 Simpan Kegiatan</button>
+  </section>
+
+  <!-- LIST -->
+  <section id="listView" class="hide">
+    <div class="filters">
+      <select id="fTeknisi">
+        <option value="">Semua teknisi</option>
+        <option>Abdul Mufid</option><option>Wawan</option>
+      </select>
+      <select id="fJenis">
+        <option value="">Semua jenis</option>
+        <option>Maintenance</option><option>PSB</option>
+      </select>
+    </div>
+    <button class="btn" id="btnCsv" style="background:var(--pri);margin:0 0 12px">⬇️ Export CSV</button>
+    <div id="list"></div>
+  </section>
+</main>
+
+<div id="loginModal" class="modal hide">
+  <div class="card" style="width:92%;max-width:360px">
+    <h3 style="margin:0 0 4px">Login Admin</h3>
+    <label>Email</label>
+    <input id="admEmail" type="email" autocomplete="username">
+    <label>Password</label>
+    <input id="admPass" type="password" autocomplete="current-password">
+    <button class="btn" id="btnLogin">Masuk</button>
+    <button class="btn" id="btnCancel" style="background:#8a93a6;margin-top:8px">Batal</button>
+  </div>
+</div>
+
+<div id="viewer"><img id="viewerImg"></div>
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, signInAnonymously, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, collection, addDoc, deleteDoc, doc, serverTimestamp, query, orderBy, limit, onSnapshot }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+/* ====== GANTI DENGAN KONFIGURASI FIREBASE ANDA (lihat README.md) ====== */
+const firebaseConfig = {
+  apiKey: "ISI_API_KEY",
+  authDomain: "ISI_PROJECT.firebaseapp.com",
+  projectId: "ISI_PROJECT_ID",
+  appId: "ISI_APP_ID"
+};
+/* ===================================================================== */
+
+const $ = id => document.getElementById(id);
+const toast = m => { const t=$("toast"); t.textContent=m; t.style.display="block"; setTimeout(()=>t.style.display="none",2800); };
+const fmt = d => d.toLocaleString("id-ID",{weekday:"long",day:"2-digit",month:"long",year:"numeric",hour:"2-digit",minute:"2-digit",second:"2-digit"});
+const esc = s => String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+setInterval(()=>$("jam").textContent=fmt(new Date()),1000);
+$("jam").textContent=fmt(new Date());
+
+/* Email admin — harus SAMA dengan yang di firestore.rules */
+const ADMIN_EMAIL = "admin@contoh.com";
+
+let db, auth, ready=false, isAdmin=false, unsub=null;
+try{
+  const app = initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  db = getFirestore(app);
+  onAuthStateChanged(auth, u=>{
+    if(!u){ signInAnonymously(auth).catch(e=>{console.error(e);$("status").textContent="Gagal terhubung (cek konfigurasi)";}); return; }
+    ready = true;
+    isAdmin = !u.isAnonymous && u.email === ADMIN_EMAIL;
+    applyRole();
+  });
+}catch(e){
+  console.error(e);
+  $("status").textContent = "Belum terhubung ke Firebase (cek konfigurasi)";
+}
+
+function applyRole(){
+  $("btnCsv").classList.toggle("hide",!isAdmin);
+  $("btnAdmin").textContent = isAdmin ? "🚪 Keluar Admin" : "🔐 Admin";
+  $("status").textContent = isAdmin ? "Mode Admin ✓" : "Mode Teknisi ✓";
+  startList();
+  render();
+}
+
+/* Login admin */
+$("btnAdmin").onclick=async()=>{
+  if(isAdmin){ await signOut(auth); toast("Keluar dari mode admin"); }
+  else $("loginModal").classList.remove("hide");
+};
+$("btnCancel").onclick=()=>$("loginModal").classList.add("hide");
+$("btnLogin").onclick=async()=>{
+  try{
+    await signInWithEmailAndPassword(auth,$("admEmail").value.trim(),$("admPass").value);
+    $("admPass").value="";
+    $("loginModal").classList.add("hide");
+    if(!isAdmin) toast("Akun ini bukan admin");
+  }catch(e){ toast("Login gagal: email/password salah"); }
+};
+
+/* Tabs */
+$("tabForm").onclick=()=>{ $("formView").classList.remove("hide"); $("listView").classList.add("hide"); $("tabForm").classList.add("on"); $("tabList").classList.remove("on"); };
+$("tabList").onclick=()=>{ $("listView").classList.remove("hide"); $("formView").classList.add("hide"); $("tabList").classList.add("on"); $("tabForm").classList.remove("on"); };
+
+/* Toggle field per jenis */
+$("jenis").onchange=()=>{
+  const psb = $("jenis").value==="PSB";
+  $("psbFields").classList.toggle("hide",!psb);
+  $("mtFields").classList.toggle("hide",psb);
+  $("fotoLabel").textContent = psb ? "Foto PSB (Done / Sudah ON) — maks. 3" : "Foto Kegiatan (maks. 3)";
+};
+
+/* Foto: kompres supaya muat di Firestore (gratis, tanpa Storage berbayar) */
+let photos=[];
+function compress(file, max=900, q=0.6){
+  return new Promise((res,rej)=>{
+    const img=new Image(), url=URL.createObjectURL(file);
+    img.onload=()=>{
+      const r=Math.min(1,max/Math.max(img.width,img.height));
+      const c=document.createElement("canvas");
+      c.width=Math.round(img.width*r); c.height=Math.round(img.height*r);
+      c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+      URL.revokeObjectURL(url);
+      res(c.toDataURL("image/jpeg",q));
+    };
+    img.onerror=rej; img.src=url;
+  });
+}
+$("foto").onchange=async e=>{
+  const files=[...e.target.files].slice(0,3);
+  photos=[]; $("previews").innerHTML="";
+  for(const f of files){
+    const d=await compress(f); photos.push(d);
+    const im=document.createElement("img"); im.src=d; $("previews").appendChild(im);
+  }
+  if(e.target.files.length>3) toast("Hanya 3 foto pertama yang dipakai");
+};
+
+/* Simpan */
+$("simpan").onclick=async()=>{
+  if(!ready) return toast("Firebase belum terhubung");
+  const teknisi=$("teknisi").value, jenis=$("jenis").value;
+  const pelanggan=$("pelanggan").value.trim(), alamat=$("alamat").value.trim();
+  if(!teknisi) return toast("Pilih nama teknisi");
+  if(!pelanggan) return toast("Isi nama pelanggan");
+
+  const data={ teknisi, jenis, pelanggan, alamat, foto:photos, waktuLokal:fmt(new Date()), waktu:serverTimestamp() };
+
+  if(jenis==="Maintenance"){
+    data.masalah=$("masalah").value.trim(); data.solusi=$("solusi").value.trim();
+    if(!data.masalah||!data.solusi) return toast("Isi masalah dan solusi final");
+  }else{
+    const k=$("kabel").value;
+    if(k==="") return toast("Isi panjang kabel (meter)");
+    if(!$("router").value.trim()) return toast("Isi router yang dipakai");
+    if(!photos.length) return toast("Tambahkan foto PSB");
+    Object.assign(data,{
+      kabelMeter:Number(k), splitter:$("splitter").value, beliSplitter:$("beliSplitter").value,
+      router:$("router").value.trim(), statusPsb:$("statusPsb").value, catatan:$("catatan").value.trim()
+    });
+  }
+
+  $("simpan").disabled=true; $("simpan").textContent="Menyimpan…";
+  try{
+    await addDoc(collection(db,"kegiatan"),data);
+    toast("Tersimpan ✓");
+    ["pelanggan","alamat","masalah","solusi","kabel","router","catatan","foto"].forEach(i=>$(i).value="");
+    photos=[]; $("previews").innerHTML="";
+    $("tabList").click();
+  }catch(err){
+    console.error(err);
+    toast("Gagal menyimpan: "+(err.code||err.message));
+  }
+  $("simpan").disabled=false; $("simpan").textContent="💾 Simpan Kegiatan";
+};
+
+/* Riwayat realtime */
+let all=[];
+function startList(){
+  if(unsub) unsub();
+  unsub=onSnapshot(query(collection(db,"kegiatan"),orderBy("waktu","desc"),limit(200)),snap=>{
+    all=snap.docs.map(d=>({id:d.id,...d.data()})); render();
+  },err=>{ console.error(err); toast("Tidak bisa membaca data (cek rules Firestore)"); });
+}
+
+/* Hapus (admin) */
+document.addEventListener("click",async e=>{
+  const id=e.target.dataset?.del;
+  if(!id||!isAdmin) return;
+  if(!confirm("Hapus catatan ini?")) return;
+  try{ await deleteDoc(doc(db,"kegiatan",id)); toast("Dihapus"); }catch(err){ toast("Gagal hapus"); }
+});
+
+/* Export CSV (admin) */
+$("btnCsv").onclick=()=>{
+  const ft=$("fTeknisi").value, fj=$("fJenis").value;
+  const rows=all.filter(r=>(!ft||r.teknisi===ft)&&(!fj||r.jenis===fj));
+  const head=["Waktu","Teknisi","Jenis","Pelanggan","Alamat","Masalah","Solusi Final","Kabel (m)","Splitter","Beli Splitter","Router","Status PSB","Catatan"];
+  const q=v=>'"'+String(v??"").replace(/"/g,'""')+'"';
+  const lines=[head.map(q).join(",")].concat(rows.map(r=>[
+    r.waktu?.toDate?fmt(r.waktu.toDate()):r.waktuLokal,r.teknisi,r.jenis,r.pelanggan,r.alamat,r.masalah,r.solusi,
+    r.kabelMeter,r.splitter,r.beliSplitter,r.router,r.statusPsb,r.catatan].map(q).join(",")));
+  const blob=new Blob(["\ufeff"+lines.join("\n")],{type:"text/csv;charset=utf-8"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+  a.download="kegiatan-teknisi.csv"; a.click();
+};
+function render(){
+  const ft=$("fTeknisi").value, fj=$("fJenis").value;
+  const rows=all.filter(r=>(!ft||r.teknisi===ft)&&(!fj||r.jenis===fj));
+  if(!rows.length){ $("list").innerHTML='<div class="empty">Belum ada catatan.</div>'; return; }
+  $("list").innerHTML=rows.map(r=>{
+    const waktu = r.waktu?.toDate ? fmt(r.waktu.toDate()) : (r.waktuLokal||"");
+    const isPsb=r.jenis==="PSB";
+    const body = isPsb ? `
+      <div class="kv"><b>Kabel:</b> ${esc(r.kabelMeter)} meter</div>
+      <div class="kv"><b>Splitter/Rasio:</b> ${esc(r.splitter)} — ${esc(r.beliSplitter)}</div>
+      <div class="kv"><b>Router:</b> ${esc(r.router)}</div>
+      ${r.catatan?`<div class="kv"><b>Catatan:</b> ${esc(r.catatan)}</div>`:""}`
+    : `
+      <div class="kv"><b>Masalah:</b> ${esc(r.masalah)}</div>
+      <div class="kv"><b>Solusi final:</b> ${esc(r.solusi)}</div>`;
+    return `<div class="card item">
+      <span class="badge ${isPsb?"b-psb":"b-mt"}">${esc(r.jenis)}</span>
+      ${isPsb?`<span class="badge b-ok">${esc(r.statusPsb)}</span>`:""}
+      <h3>${esc(r.pelanggan)}</h3>
+      <div class="meta">👷 ${esc(r.teknisi)} · 🕒 ${esc(waktu)}</div>
+      ${r.alamat?`<div class="kv"><b>Lokasi:</b> ${esc(r.alamat)}</div>`:""}
+      ${body}
+      <div class="photos">${(r.foto||[]).map(f=>`<img src="${f}" data-big>`).join("")}</div>
+      ${isAdmin?`<button class="del" data-del="${r.id}">🗑 Hapus</button>`:""}
+    </div>`;
+  }).join("");
+}
+$("fTeknisi").onchange=render; $("fJenis").onchange=render;
+
+/* Lihat foto besar */
+document.addEventListener("click",e=>{
+  if(e.target.matches("img[data-big],.previews img")){ $("viewerImg").src=e.target.src; $("viewer").style.display="flex"; }
+});
+$("viewer").onclick=()=>$("viewer").style.display="none";
+</script>
+</body>
+</html>
