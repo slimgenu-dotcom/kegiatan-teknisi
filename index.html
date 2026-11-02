@@ -172,10 +172,12 @@ import { getFirestore, collection, addDoc, deleteDoc, doc, serverTimestamp, quer
 
 /* ====== GANTI DENGAN KONFIGURASI FIREBASE ANDA (lihat README.md) ====== */
 const firebaseConfig = {
-  apiKey: "ISI_API_KEY",
-  authDomain: "ISI_PROJECT.firebaseapp.com",
-  projectId: "ISI_PROJECT_ID",
-  appId: "ISI_APP_ID"
+  apiKey: "AIzaSyCn1YLinBq1AGS0ljefRu0bbXaCNVnhC1E",
+  authDomain: "kegiatan-teknisi.firebaseapp.com",
+  projectId: "kegiatan-teknisi",
+  storageBucket: "kegiatan-teknisi.firebasestorage.app",
+  messagingSenderId: "330978587678",
+  appId: "1:330978587678:web:84813ded5fb8de6feb2a0f"
 };
 /* ===================================================================== */
 
@@ -188,7 +190,7 @@ setInterval(()=>$("jam").textContent=fmt(new Date()),1000);
 $("jam").textContent=fmt(new Date());
 
 /* Email admin — harus SAMA dengan yang di firestore.rules */
-const ADMIN_EMAIL = "admin@contoh.com";
+const ADMIN_EMAIL = "admin@gmail.com";
 
 let db, auth, ready=false, isAdmin=false, unsub=null;
 try{
