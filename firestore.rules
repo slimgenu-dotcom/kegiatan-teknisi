@@ -5,7 +5,7 @@ service cloud.firestore {
     // Ganti dengan email admin Anda (harus sama dengan ADMIN_EMAIL di index.html)
     function isAdmin() {
       return request.auth != null
-        && request.auth.token.email == 'admin@contoh.com';
+        && request.auth.token.email == 'admin@gmail.com';
     }
 
     match /kegiatan/{doc} {
