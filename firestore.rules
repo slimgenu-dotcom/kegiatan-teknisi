@@ -17,11 +17,19 @@ service cloud.firestore {
         && request.resource.data.teknisi in ['Abdul Mufid', 'Wawan']
         && request.resource.data.jenis in ['Maintenance', 'PSB'];
 
-      // Hanya admin yang boleh MENGHAPUS
+      // Hanya admin yang boleh MENGHAPUS catatan
       allow delete: if isAdmin();
 
-      // Tidak ada yang boleh mengedit catatan
-      allow update: if false;
+      // Satu-satunya perubahan yang diizinkan: pembersihan foto otomatis,
+      // yaitu mengosongkan foto setelah lewat batas waktu (hapusFotoPada).
+      // Teks catatan tidak bisa diedit oleh siapa pun.
+      allow update: if request.auth != null
+        && 'hapusFotoPada' in resource.data
+        && resource.data.hapusFotoPada <= request.time
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['foto', 'fotoDihapus', 'hapusFotoPada'])
+        && request.resource.data.foto.size() == 0
+        && request.resource.data.fotoDihapus == true;
     }
   }
 }

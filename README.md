@@ -33,6 +33,12 @@ Hak akses:
 
 Catatan: siapa pun yang membuka alamat web aplikasi bisa melihat riwayat (termasuk nama pelanggan, alamat, dan foto). Jangan bagikan alamat webnya ke orang di luar tim.
 
+## Foto terhapus otomatis (60 hari)
+- Setiap kegiatan baru diberi tanggal hapus foto (`hapusFotoPada`) = 60 hari sejak entry.
+- Saat aplikasi dibuka (teknisi atau admin), aplikasi membersihkan foto kegiatan yang sudah lewat batas. Teks catatan tetap tersimpan.
+- Ini berjalan di sisi aplikasi (paket Spark tidak punya Cloud Functions terjadwal), jadi pembersihan terjadi saat ada yang membuka aplikasi.
+- Kegiatan yang dibuat sebelum fitur ini tidak punya tanggal hapus, jadi fotonya tidak ikut terhapus otomatis.
+
 ## Langkah 2 — Upload ke GitHub & aktifkan Pages
 1. Buat repository baru di GitHub (mis. `catatan-teknisi`).
 2. Upload `index.html`, `firestore.rules`, `README.md`.

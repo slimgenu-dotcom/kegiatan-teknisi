@@ -134,9 +134,13 @@
       <textarea id="catatan"></textarea>
     </div>
 
-    <label id="fotoLabel">Foto Kegiatan (maks. 3)</label>
+    <label id="fotoLabel">Foto Kegiatan (1–10 foto)</label>
     <input id="foto" type="file" accept="image/*" multiple>
     <div class="previews" id="previews"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+      <span class="meta" id="fotoCount">0/10 foto</span>
+      <button type="button" id="btnClearFoto" class="del" style="margin:0;background:#8a93a6">Ulangi pilih foto</button>
+    </div>
 
     <div class="stamp">🕒 Tanggal &amp; jam entry dicatat otomatis: <b id="jam"></b></div>
     <button class="btn" id="simpan">💾 Simpan Kegiatan</button>
@@ -188,7 +192,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, signInAnonymously, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, collection, addDoc, deleteDoc, doc, serverTimestamp, query, where, orderBy, limit, onSnapshot }
+import { getFirestore, collection, addDoc, deleteDoc, doc, getDocs, updateDoc, deleteField, Timestamp, serverTimestamp, query, where, orderBy, limit, onSnapshot }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 /* ====== GANTI DENGAN KONFIGURASI FIREBASE ANDA (lihat README.md) ====== */
@@ -235,6 +239,22 @@ function applyRole(){
   $("status").textContent = isAdmin ? "Mode Admin ✓" : "Mode Teknisi ✓";
   startList();
   render();
+  if(!cleaned){ cleaned=true; cleanupFoto(); }
+}
+
+/* Hapus foto otomatis untuk kegiatan yang sudah lewat 60 hari (data teks tetap tersimpan) */
+let cleaned=false;
+async function cleanupFoto(){
+  try{
+    for(let i=0;i<4;i++){
+      const snap=await getDocs(query(collection(db,"kegiatan"),where("hapusFotoPada","<=",Timestamp.now()),limit(25)));
+      if(snap.empty) break;
+      for(const d of snap.docs){
+        await updateDoc(d.ref,{foto:[],fotoDihapus:true,hapusFotoPada:deleteField()});
+      }
+      if(snap.size<25) break;
+    }
+  }catch(e){ console.error("Cleanup foto:",e); }
 }
 
 /* Login admin */
@@ -261,7 +281,7 @@ $("jenis").onchange=()=>{
   const psb = $("jenis").value==="PSB";
   $("psbFields").classList.toggle("hide",!psb);
   $("mtFields").classList.toggle("hide",psb);
-  $("fotoLabel").textContent = psb ? "Foto PSB (Done / Sudah ON) — maks. 3" : "Foto Kegiatan (maks. 3)";
+  $("fotoLabel").textContent = psb ? "Foto PSB (Done / Sudah ON) — 1–10 foto" : "Foto Kegiatan (1–10 foto)";
 };
 
 /* Foto: kompres supaya muat di Firestore (gratis, tanpa Storage berbayar) */
@@ -280,15 +300,33 @@ function compress(file, max=900, q=0.6){
     img.onerror=rej; img.src=url;
   });
 }
-$("foto").onchange=async e=>{
-  const files=[...e.target.files].slice(0,3);
-  photos=[]; $("previews").innerHTML="";
-  for(const f of files){
-    const d=await compress(f); photos.push(d);
-    const im=document.createElement("img"); im.src=d; $("previews").appendChild(im);
+/* Maks. 10 foto per kegiatan; tiap foto dikecilkan ke ±75 KB agar total < batas 1 MB per dokumen Firestore */
+const MAXFOTO=10, TARGET=75000;
+async function compressTo(file){
+  let max=1000, q=0.7, out="";
+  for(let i=0;i<9;i++){
+    out=await compress(file,max,q);
+    if(out.length<=TARGET) return out;
+    if(q>0.4) q=Math.round((q-0.1)*10)/10; else max=Math.round(max*0.8);
   }
-  if(e.target.files.length>3) toast("Hanya 3 foto pertama yang dipakai");
+  return out;
+}
+const updFotoCount=()=>{ $("fotoCount").textContent=photos.length+"/"+MAXFOTO+" foto"; };
+$("foto").onchange=async e=>{
+  const files=[...e.target.files]; e.target.value="";
+  const slot=MAXFOTO-photos.length;
+  if(slot<=0) return toast("Maksimal 10 foto per kegiatan");
+  if(files.length>slot) toast("Maksimal 10 foto, kelebihannya diabaikan");
+  else toast("Memproses foto…");
+  for(const f of files.slice(0,slot)){
+    try{
+      const d=await compressTo(f); photos.push(d);
+      const im=document.createElement("img"); im.src=d; $("previews").appendChild(im);
+    }catch(err){ console.error(err); toast("Ada foto yang gagal diproses"); }
+  }
+  updFotoCount();
 };
+$("btnClearFoto").onclick=()=>{ photos=[]; $("previews").innerHTML=""; updFotoCount(); };
 
 /* Simpan */
 $("simpan").onclick=async()=>{
@@ -297,8 +335,10 @@ $("simpan").onclick=async()=>{
   const pelanggan=$("pelanggan").value.trim(), alamat=$("alamat").value.trim();
   if(!teknisi) return toast("Pilih nama teknisi");
   if(!pelanggan) return toast("Isi nama pelanggan");
+  if(photos.length<1) return toast("Tambahkan minimal 1 foto (maks. 10)");
 
-  const data={ teknisi, jenis, pelanggan, alamat, foto:photos, waktuLokal:fmt(new Date()), waktu:serverTimestamp() };
+  const data={ teknisi, jenis, pelanggan, alamat, foto:photos, waktuLokal:fmt(new Date()), waktu:serverTimestamp(),
+    hapusFotoPada:Timestamp.fromDate(new Date(Date.now()+60*24*3600*1000)) /* foto dihapus otomatis setelah 60 hari (±2 bulan) */ };
 
   if(jenis==="Maintenance"){
     data.masalah=$("masalah").value.trim(); data.solusi=$("solusi").value.trim();
@@ -319,7 +359,7 @@ $("simpan").onclick=async()=>{
     await addDoc(collection(db,"kegiatan"),data);
     toast("Tersimpan ✓");
     ["pelanggan","alamat","masalah","solusi","kabel","router","catatan","foto"].forEach(i=>$(i).value="");
-    photos=[]; $("previews").innerHTML="";
+    photos=[]; $("previews").innerHTML=""; updFotoCount();
     $("tabList").click();
   }catch(err){
     console.error(err);
@@ -455,6 +495,7 @@ function render(){
       ${r.alamat?`<div class="kv"><b>Lokasi:</b> ${esc(r.alamat)}</div>`:""}
       ${body}
       <div class="photos">${(r.foto||[]).map(f=>`<img src="${f}" data-big>`).join("")}</div>
+      ${r.fotoDihapus?`<div class="meta" style="margin-top:6px">🗑 Foto sudah dihapus otomatis (lebih dari 2 bulan)</div>`:(r.hapusFotoPada?.toDate?`<div class="meta" style="margin-top:6px">⏳ Foto dihapus otomatis pada ${r.hapusFotoPada.toDate().toLocaleDateString("id-ID",{day:"numeric",month:"long",year:"numeric"})}</div>`:"")}
       ${isAdmin?`<button class="del" data-del="${r.id}">🗑 Hapus</button>`:""}
     </div>`;
   }).join("");
