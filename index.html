@@ -39,6 +39,16 @@
   #viewer img{max-width:95%;max-height:92%}
   .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:10px 18px;border-radius:24px;font-size:14px;z-index:60;display:none}
   .empty{text-align:center;color:var(--mut);padding:30px}
+  .monthbar{display:flex;gap:8px;align-items:center}
+  .monthbar select{flex:1;font-weight:700}
+  .nav{border:1px solid var(--line);background:#fff;border-radius:8px;padding:10px 14px;font-size:15px;cursor:pointer}
+  .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:12px}
+  .dow{text-align:center;font-size:11px;font-weight:700;color:var(--mut);padding:4px 0}
+  .day{position:relative;aspect-ratio:1/1;border:1px solid var(--line);background:#fff;border-radius:8px;font-size:14px;cursor:pointer;padding:0}
+  .day.has{background:#e3f2fd;font-weight:700}
+  .day.today{border:2px solid var(--pri)}
+  .day.sel{background:var(--pri);color:#fff;border-color:var(--pri)}
+  .day .cnt{position:absolute;top:2px;right:3px;background:var(--warn);color:#fff;border-radius:10px;font-size:10px;min-width:16px;line-height:16px;font-weight:700}
 </style>
 </head>
 <body>
@@ -134,6 +144,17 @@
 
   <!-- LIST -->
   <section id="listView" class="hide">
+    <div class="card">
+      <div class="monthbar">
+        <button id="btnPrev" class="nav">◀</button>
+        <select id="selBulan"></select>
+        <button id="btnNext" class="nav">▶</button>
+      </div>
+      <div id="ringkas" class="stamp"></div>
+      <div id="cal" class="cal"></div>
+      <button id="btnSemua" class="del" style="background:#546e7a">Tampilkan semua tanggal</button>
+    </div>
+    <h3 id="judulList" style="margin:4px 4px 10px;font-size:15px"></h3>
     <div class="filters">
       <select id="fTeknisi">
         <option value="">Semua teknisi</option>
@@ -167,7 +188,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, signInAnonymously, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, collection, addDoc, deleteDoc, doc, serverTimestamp, query, orderBy, limit, onSnapshot }
+import { getFirestore, collection, addDoc, deleteDoc, doc, serverTimestamp, query, where, orderBy, limit, onSnapshot }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 /* ====== GANTI DENGAN KONFIGURASI FIREBASE ANDA (lihat README.md) ====== */
@@ -198,14 +219,14 @@ try{
   auth = getAuth(app);
   db = getFirestore(app);
   onAuthStateChanged(auth, u=>{
-    if(!u){ signInAnonymously(auth).catch(e=>{console.error(e);$("status").textContent="Gagal terhubung (cek konfigurasi)";}); return; }
+    if(!u){ signInAnonymously(auth).catch(e=>{console.error(e);$("status").textContent="Gagal login: "+(e.code||e.message);}); return; }
     ready = true;
     isAdmin = !u.isAnonymous && u.email === ADMIN_EMAIL;
     applyRole();
   });
 }catch(e){
   console.error(e);
-  $("status").textContent = "Belum terhubung ke Firebase (cek konfigurasi)";
+  $("status").textContent = "Gagal init Firebase: "+(e.code||e.message);
 }
 
 function applyRole(){
@@ -307,14 +328,87 @@ $("simpan").onclick=async()=>{
   $("simpan").disabled=false; $("simpan").textContent="💾 Simpan Kegiatan";
 };
 
-/* Riwayat realtime */
+/* Riwayat per bulan + kalender */
 let all=[];
+const BULAN=["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
+const nowD=new Date();
+let viewMonth=new Date(nowD.getFullYear(),nowD.getMonth(),1);
+let selDay=nowD.getDate();   // awal: tanggal hari ini
+let followNow=true;          // true = otomatis pindah ke bulan baru tiap tanggal 1
+let lastToday=nowD.toDateString();
+const tglOf=r=>r.waktu?.toDate?r.waktu.toDate():new Date();
+
+function buildMonthSelect(){
+  const sel=$("selBulan"), n=new Date(); sel.innerHTML="";
+  for(let i=0;i<36;i++){
+    const d=new Date(n.getFullYear(),n.getMonth()-i,1);
+    const o=document.createElement("option");
+    o.value=d.getFullYear()+"-"+d.getMonth();
+    o.textContent=BULAN[d.getMonth()]+" "+d.getFullYear();
+    sel.appendChild(o);
+  }
+  sel.value=viewMonth.getFullYear()+"-"+viewMonth.getMonth();
+}
+function setMonth(y,m){
+  const n=new Date();
+  const cur=(y===n.getFullYear()&&m===n.getMonth());
+  followNow=cur; viewMonth=new Date(y,m,1);
+  selDay=cur?n.getDate():null;
+  buildMonthSelect(); startList();
+}
 function startList(){
+  if(!db) return;
   if(unsub) unsub();
-  unsub=onSnapshot(query(collection(db,"kegiatan"),orderBy("waktu","desc"),limit(200)),snap=>{
+  const s=viewMonth, e=new Date(s.getFullYear(),s.getMonth()+1,1);
+  unsub=onSnapshot(query(collection(db,"kegiatan"),where("waktu",">=",s),where("waktu","<",e),orderBy("waktu","desc"),limit(500)),snap=>{
     all=snap.docs.map(d=>({id:d.id,...d.data()})); render();
   },err=>{ console.error(err); toast("Tidak bisa membaca data (cek rules Firestore)"); });
+  all=[]; render();
 }
+$("selBulan").onchange=()=>{ const [y,m]=$("selBulan").value.split("-").map(Number); setMonth(y,m); };
+$("btnPrev").onclick=()=>setMonth(new Date(viewMonth.getFullYear(),viewMonth.getMonth()-1,1).getFullYear(),new Date(viewMonth.getFullYear(),viewMonth.getMonth()-1,1).getMonth());
+$("btnNext").onclick=()=>{
+  const d=new Date(viewMonth.getFullYear(),viewMonth.getMonth()+1,1), n=new Date();
+  if(d>new Date(n.getFullYear(),n.getMonth(),1)) return toast("Belum ada bulan berikutnya");
+  setMonth(d.getFullYear(),d.getMonth());
+};
+$("btnSemua").onclick=()=>{ selDay=null; render(); };
+buildMonthSelect();
+
+/* Reset otomatis: tanggal 1 pindah ke bulan baru (data lama tetap tersimpan di riwayat bulan) */
+setInterval(()=>{
+  const n=new Date();
+  if(n.toDateString()===lastToday) return;
+  const prevSel=(selDay===new Date(lastToday).getDate());
+  lastToday=n.toDateString();
+  if(followNow && (viewMonth.getMonth()!==n.getMonth()||viewMonth.getFullYear()!==n.getFullYear())){ setMonth(n.getFullYear(),n.getMonth()); }
+  else if(followNow && prevSel){ selDay=n.getDate(); render(); }
+},60000);
+
+function renderCal(){
+  const y=viewMonth.getFullYear(), m=viewMonth.getMonth();
+  const first=new Date(y,m,1).getDay(), days=new Date(y,m+1,0).getDate();
+  const counts={};
+  all.forEach(r=>{ const d=tglOf(r); if(d.getFullYear()===y&&d.getMonth()===m) counts[d.getDate()]=(counts[d.getDate()]||0)+1; });
+  const t=new Date();
+  let h=["Min","Sen","Sel","Rab","Kam","Jum","Sab"].map(x=>`<div class="dow">${x}</div>`).join("");
+  for(let i=0;i<first;i++) h+="<div></div>";
+  for(let d=1;d<=days;d++){
+    const c=counts[d]||0, isToday=(t.getFullYear()===y&&t.getMonth()===m&&t.getDate()===d);
+    h+=`<button class="day ${c?"has":""} ${isToday?"today":""} ${selDay===d?"sel":""}" data-day="${d}">${d}${c?`<span class="cnt">${c}</span>`:""}</button>`;
+  }
+  $("cal").innerHTML=h;
+  const mt=all.filter(r=>r.jenis==="Maintenance").length, psb=all.filter(r=>r.jenis==="PSB").length;
+  const ab=all.filter(r=>r.teknisi==="Abdul Mufid").length, wa=all.filter(r=>r.teknisi==="Wawan").length;
+  $("ringkas").innerHTML=`Total ${BULAN[m]} ${y}: <b>${all.length}</b> kegiatan · Maintenance <b>${mt}</b> · PSB <b>${psb}</b><br>Abdul Mufid <b>${ab}</b> · Wawan <b>${wa}</b>`;
+  $("judulList").textContent = selDay ? `Kegiatan tanggal ${selDay} ${BULAN[m]} ${y}` : `Semua kegiatan ${BULAN[m]} ${y}`;
+}
+document.addEventListener("click",e=>{
+  const b=e.target.closest?.(".day");
+  if(!b) return;
+  const d=Number(b.dataset.day);
+  selDay=(selDay===d)?null:d; render();
+});
 
 /* Hapus (admin) */
 document.addEventListener("click",async e=>{
@@ -335,12 +429,13 @@ $("btnCsv").onclick=()=>{
     r.kabelMeter,r.splitter,r.beliSplitter,r.router,r.statusPsb,r.catatan].map(q).join(",")));
   const blob=new Blob(["\ufeff"+lines.join("\n")],{type:"text/csv;charset=utf-8"});
   const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
-  a.download="kegiatan-teknisi.csv"; a.click();
+  a.download="kegiatan-"+viewMonth.getFullYear()+"-"+String(viewMonth.getMonth()+1).padStart(2,"0")+".csv"; a.click();
 };
 function render(){
+  renderCal();
   const ft=$("fTeknisi").value, fj=$("fJenis").value;
-  const rows=all.filter(r=>(!ft||r.teknisi===ft)&&(!fj||r.jenis===fj));
-  if(!rows.length){ $("list").innerHTML='<div class="empty">Belum ada catatan.</div>'; return; }
+  const rows=all.filter(r=>(!ft||r.teknisi===ft)&&(!fj||r.jenis===fj)&&(!selDay||tglOf(r).getDate()===selDay));
+  if(!rows.length){ $("list").innerHTML='<div class="empty">Tidak ada kegiatan.</div>'; return; }
   $("list").innerHTML=rows.map(r=>{
     const waktu = r.waktu?.toDate ? fmt(r.waktu.toDate()) : (r.waktuLokal||"");
     const isPsb=r.jenis==="PSB";
